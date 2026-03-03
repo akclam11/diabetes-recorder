@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0F172A">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="糖友記錄">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="糖友記錄">
+    <meta name="msapplication-TileColor" content="#0F172A">
+    <meta name="msapplication-TileImage" content="logo.png">
+    
+    <title>糖友指數記錄儀 | Salus Healthcare</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="logo.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="logo.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="logo.png">
+    
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.tailwindcss.com">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        medical: { 50: '#F0F9FF', 100: '#E0F2FE', 500: '#0EA5E9', 600: '#0284C7', 700: '#0369A1', 900: '#0C4A6E' },
+                        clinical: { 50: '#F8FAFC', 100: '#F1F5F9', 200: '#E2E8F0', 300: '#CBD5E1', 400: '#94A3B8', 500: '#64748B', 600: '#475569', 700: '#334155', 800: '#1E293B', 900: '#0F172A' },
+                        alert: { low: '#3B82F6', normal: '#10B981', high: '#F59E0B', danger: '#EF4444' }
+                    },
+                    fontFamily: { sans: ['"Inter"', '"Noto Sans TC"', 'sans-serif'], mono: ['"Inter"', 'monospace'] }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { font-family: 'Inter', 'Noto Sans TC', sans-serif; background-color: #F8FAFC; -webkit-font-smoothing: antialiased; overscroll-behavior-y: none; }
+        .app-container { max-width: 480px; margin: 0 auto; background-color: #F8FAFC; min-height: 100vh; position: relative; box-shadow: 0 0 40px rgba(0,0,0,0.08); }
+        input[type="number"] { font-family: 'Inter', monospace; font-variant-numeric: tabular-nums; }
+        input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .clinical-card { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); border: 1px solid #E2E8F0; }
+        .clinical-card:hover { border-color: #0EA5E9; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .clinical-card:focus-within { border-color: #0EA5E9; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15); }
+        .nav-glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-top: 1px solid rgba(226, 232, 240, 0.8); }
+        .input-clinical:focus { outline: none; border-color: #0EA5E9; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15); background-color: #F0F9FF; }
+        .patient-select-card { transition: all 0.2s; border: 2px solid transparent; }
+        .patient-select-card:hover { border-color: #0EA5E9; background-color: #F0F9FF; }
+        .patient-select-card.active { border-color: #0284C7; background-color: #E0F2FE; }
+        @keyframes slideInUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .animate-slide-up { animation: slideInUp 0.3s ease-out; }
+        .chart-container { position: relative; height: 200px; width: 100%; }
+        input[type="date"] { font-family: 'Inter', sans-serif; }
+        
+        /* PWA Splash Screen Animation */
+        #splash-screen {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s ease-out, visibility 0.5s;
+        }
+        #splash-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+        .splash-logo {
+            width: 120px;
+            height: 120px;
+            object-fit: contain;
+            margin-bottom: 24px;
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: .8; transform: scale(1.05); }
+        }
+        .splash-text {
+            color: white;
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .splash-subtext {
+            color: #94A3B8;
+            font-size: 0.875rem;
+        }
+        
+        /* Install Prompt */
+        #install-prompt {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            z-index: 100;
+            display: none;
+            align-items: center;
+            gap: 12px;
+            max-width: 90%;
+            width: 360px;
+            border: 1px solid #E2E8F0;
+        }
+        #install-prompt.show { display: flex; }
+    </style>
+</head>
+<body class="text-clinical-800">
+
+<!-- Splash Screen -->
+<div id="splash-screen">
+    <img src="logo.png" alt="Salus Healthcare" class="splash-logo" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏥</text></svg>'">
+    <div class="splash-text">Salus Healthcare</div>
+    <div class="splash-subtext">糖友指數記錄儀</div>
+</div>
+
+<!-- Install Prompt -->
+<div id="install-prompt">
+    <div style="flex: 1;">
+        <div style="font-weight: 600; color: #1E293B; margin-bottom: 4px;">安裝到主畫面</div>
+        <div style="font-size: 0.875rem; color: #64748B;">像 App 一樣使用，離線也可開啟</div>
+    </div>
+    <button onclick="installPWA()" style="background: #0284C7; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 500; cursor: pointer; white-space: nowrap;">安裝</button>
+    <button onclick="dismissInstall()" style="background: none; border: none; color: #64748B; cursor: pointer; padding: 4px;"><i class="fas fa-times"></i></button>
+</div>
+
+<div id="app" class="app-container">
+    
+    <!-- Header -->
+    <header class="bg-clinical-900 text-white sticky top-0 z-50 shadow-lg">
+        <div class="px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <img src="logo.png" 
+                     alt="Salus Healthcare" 
+                     class="w-8 h-8 object-contain rounded-lg bg-white p-0.5"
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+                <div class="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center hidden">
+                    <i class="fas fa-heart-pulse text-medical-400 text-sm"></i>
+                </div>
+                <div>
+                    <h1 class="text-sm font-bold tracking-wide uppercase text-clinical-200">Salus Healthcare</h1>
+                    <p class="text-xs text-clinical-400">糖友指數記錄儀</p>
+                </div>
+            </div>
+            
+            <div id="currentPatientBadge" class="hidden flex items-center space-x-2 bg-white/10 px-3 py-1.5 rounded-full border border-white/10 cursor-pointer hover:bg-white/20 transition-colors" onclick="clearPatientSelection()">
+                <div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+                <span id="headerPatientName" class="text-sm font-medium text-white">--</span>
+                <i class="fas fa-times text-xs text-clinical-400 ml-1"></i>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main id="mainContent" class="pb-24 pt-4 px-4 min-h-screen"></main>
+
+    <!-- Bottom Navigation -->
+    <nav class="nav-glass fixed bottom-0 left-0 right-0 z-50" style="max-width: 480px; margin: 0 auto;">
+        <div class="flex justify-around items-center h-16">
+            <button onclick="showPage('patients')" class="nav-btn flex flex-col items-center justify-center w-full h-full space-y-1 text-clinical-400 hover:text-medical-600 transition-colors" data-page="patients">
+                <i class="fas fa-users-medical text-lg"></i>
+                <span class="text-[10px] font-medium uppercase">病人</span>
+            </button>
+            
+            <button onclick="showPage('record')" class="nav-btn flex flex-col items-center justify-center w-full h-full space-y-1 text-clinical-400 hover:text-medical-600 transition-colors relative" data-page="record">
+                <div class="w-12 h-12 bg-medical-600 rounded-full flex items-center justify-center text-white shadow-lg shadow-medical-500/30 -mt-6 border-4 border-clinical-50 hover:scale-105 transition-transform">
+                    <i class="fas fa-plus text-xl"></i>
+                </div>
+                <span class="text-[10px] font-medium uppercase">記錄</span>
+            </button>
+            
+            <button onclick="showPage('report')" class="nav-btn flex flex-col items-center justify-center w-full h-full space-y-1 text-clinical-400 hover:text-medical-600 transition-colors" data-page="report">
+                <i class="fas fa-chart-line text-lg"></i>
+                <span class="text-[10px] font-medium uppercase">報表</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Toast -->
+    <div id="toastContainer" class="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none"></div>
+
+    <!-- Patient Modal -->
+    <div id="patientModal" class="fixed inset-0 bg-clinical-900/60 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl animate-slide-up max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white border-b border-clinical-100 px-6 py-4 flex justify-between items-center z-10">
+                <div>
+                    <h2 class="text-lg font-bold text-clinical-900" id="modalTitle">新增病人</h2>
+                    <p class="text-xs text-clinical-500">建立新病歷檔案</p>
+                </div>
+                <button onclick="closePatientModal()" class="w-8 h-8 rounded-full bg-clinical-100 flex items-center justify-center text-clinical-600">
+                    <i class="fas fa-times text-sm"></i>
+                </button>
+            </div>
+            
+            <form id="patientForm" onsubmit="savePatient(event)" class="p-6 space-y-4">
+                <input type="hidden" id="patientId">
+                <div>
+                    <label class="block text-xs font-semibold text-clinical-600 uppercase mb-1">姓名 <span class="text-red-500">*</span></label>
+                    <input type="text" id="pName" required class="w-full px-4 py-3 bg-clinical-50 border border-clinical-200 rounded-lg input-clinical">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-clinical-600 uppercase mb-1">年齡</label>
+                        <input type="number" id="pAge" class="w-full px-4 py-3 bg-clinical-50 border border-clinical-200 rounded-lg input-clinical">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-clinical-600 uppercase mb-1">性別</label>
+                        <select id="pGender" class="w-full px-4 py-3 bg-clinical-50 border border-clinical-200 rounded-lg input-clinical">
+                            <option value="">選擇</option>
+                            <option value="男">男</option>
+                            <option value="女">女</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-clinical-600 uppercase mb-1">身高 (cm)</label>
+                        <input type="number" id="pHeight" step="0.1" class="w-full px-4 py-3 bg-clinical-50 border border-clinical-200 rounded-lg input-clinical">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-clinical-600 uppercase mb-1">確診年份</label>
+                        <input type="number" id="pDiagnosisYear" placeholder="YYYY" class="w-full px-4 py-3 bg-clinical-50 border border-clinical-200 rounded-lg input-clinical">
+                    </div>
+                </div>
+                <div class="pt-2 flex space-x-3">
+                    <button type="button" onclick="closePatientModal()" class="flex-1 py-3 border border-clinical-300 rounded-lg text-clinical-600 font-semibold">取消</button>
+                    <button type="submit" class="flex-1 py-3 bg-medical-600 text-white rounded-lg font-semibold shadow-lg shadow-medical-500/25">儲存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// PWA Service Worker Registration
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('data:text/javascript;base64,' + btoa(`
+            const CACHE_NAME = 'diabetes-recorder-v1';
+            const urlsToCache = [
+                './',
+                './index.html',
+                './logo.png',
+                './manifest.json'
+            ];
+
+            self.addEventListener('install', event => {
+                event.waitUntil(
+                    caches.open(CACHE_NAME)
+                        .then(cache => cache.addAll(urlsToCache))
+                );
+                self.skipWaiting();
+            });
+
+            self.addEventListener('fetch', event => {
+                event.respondWith(
+                    caches.match(event.request)
+                        .then(response => {
+                            if (response) return response;
+                            return fetch(event.request).catch(() => {
+                                if (event.request.destination === 'document') {
+                                    return caches.match('./index.html');
+                                }
+                            });
+                        })
+                );
+            });
+
+            self.addEventListener('activate', event => {
+                event.waitUntil(self.clients.claim());
+            });
+        `)).then(registration => {
+            console.log('SW registered:', registration);
+        }).catch(error => {
+            console.log('SW registration failed:', error);
+        });
+    });
+}
+
+// PWA Install Prompt
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    if (!localStorage.getItem('pwa-dismissed')) {
+        setTimeout(() => {
+            document.getElementById('install-prompt').classList.add('show');
+        }, 2000);
+    }
+});
+
+function installPWA() {
+    document.getElementById('install-prompt').classList.remove('show');
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+            if (choiceResult.outcome === 'accepted') {
+                console.log('User accepted PWA install');
+            }
+            deferredPrompt = null;
+        });
+    }
+}
+
+function dismissInstall() {
+    document.getElementById('install-prompt').classList.remove('show');
+    localStorage.setItem('pwa-dismissed', 'true');
+}
+
+// Splash Screen
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        document.getElementById('splash-screen').classList.add('hidden');
+    }, 1500);
+});
+
+// App Data
+let appData = { patients: [], currentPatientId: null };
+
+const healthItems = [
+    { id: 'weight', name: '體重', unit: 'kg', icon: 'fa-weight-scale', refMin: null, refMax: null, placeholder: '00.0', step: 0.1 },
+    { id: 'systolicBP', name: '收縮壓', unit: 'mmHg', icon: 'fa-heart', refMin: 90, refMax: 140, placeholder: '120', step: 1 },
+    { id: 'diastolicBP', name: '舒張壓', unit: 'mmHg', icon: 'fa-heart-pulse', refMin: 60, refMax: 90, placeholder: '80', step: 1 },
+    { id: 'hba1c', name: '糖化血紅蛋白', unit: '%', icon: 'fa-droplet', refMin: 4, refMax: 6.5, step: 0.1, placeholder: '0.0' },
+    { id: 'fastingGlucose', name: '空腹血糖', unit: 'mmol/L', icon: 'fa-mug-hot', refMin: 3.9, refMax: 6.1, step: 0.1, placeholder: '0.0' },
+    { id: 'breakfast2h', name: '早餐後2小時', unit: 'mmol/L', icon: 'fa-bread-slice', refMin: 3.9, refMax: 7.8, step: 0.1, placeholder: '0.0' },
+    { id: 'lunch2h', name: '午餐後2小時', unit: 'mmol/L', icon: 'fa-bowl-rice', refMin: 3.9, refMax: 7.8, step: 0.1, placeholder: '0.0' },
+    { id: 'dinner2h', name: '晚餐後2小時', unit: 'mmol/L', icon: 'fa-utensils', refMin: 3.9, refMax: 7.8, step: 0.1, placeholder: '0.0' }
+];
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    loadData();
+    showPage('patients');
+    updateHeaderPatient();
+});
+
+function loadData() { 
+    const saved = localStorage.getItem('diabetesAppProData'); 
+    if (saved) appData = JSON.parse(saved); 
+}
+
+function saveData() { 
+    localStorage.setItem('diabetesAppProData', JSON.stringify(appData)); 
+}
+
+function generateId() { 
+    return 'P' + Date.now().toString(36).toUpperCase(); 
+}
+
+function showToast(message, type = 'success') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    const bgColor = type === 'success' ? 'bg-emerald-500' : type === 'error' ? 'bg-red-500' : 'bg-medical-600';
+    const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
+    
+    toast.className = `animate-slide-up ${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center space-x-2 mb-2 min-w-[200px] justify-center`;
+    toast.innerHTML = `<i class="fas ${icon}"></i><span class="text-sm font-medium">${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => { 
+        toast.style.opacity = '0'; 
+        setTimeout(() => toast.remove(), 300); 
+    }, 2500);
+}
+
+function showPage(page) {
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        if (btn.dataset.page === page) {
+            btn.classList.remove('text-clinical-400');
+            btn.classList.add('text-medical-600');
+        } else {
+            btn.classList.add('text-clinical-400');
+            btn.classList.remove('text-medical-600');
+        }
+    });
+
+    const content = document.getElementById('mainContent');
+    content.style.opacity = '0';
+    setTimeout(() => {
+        switch(page) {
+            case 'patients': renderPatientsPage(content); break;
+            case 'record': renderRecordPage(content); break;
+            case 'report': renderReportPage(content); break;
+        }
+        content.style.opacity = '1';
+        content.style.transition = 'opacity 0.2s';
+    }, 100);
+}
+
+function renderPatientsPage(container) {
+    const patients = appData.patients;
+    let html = `
+        <div class="flex justify-between items-end mb-6">
+            <div>
+                <h2 class="text-2xl font-bold text-clinical-900">病人管理</h2>
+                <p class="text-sm text-clinical-500">共 ${patients.length} 位登記病人</p>
+            </div>
+            <button onclick="openPatientModal()" class="bg-medical-600 text-white w-10 h-10 rounded-full shadow-lg flex items-center justify-center hover:bg-medical-700">
+                <i class="fas fa-plus"></i>
+            </button>
+        </div>
+    `;
+
+    if (patients.length === 0) {
+        html += `
+            <div class="bg-white rounded-2xl border-2 border-dashed border-clinical-200 p-12 text-center">
+                <div class="w-16 h-16 bg-clinical-100 rounded-full flex items-center justify-center mx-auto mb-4 text-clinical-400">
+                    <i class="fas fa-user-plus text-2xl"></i>
+                </div>
+                <h3 class="text-clinical-900 font-semibold mb-1">暫無病人資料</h3>
+                <p class="text-sm text-clinical-500 mb-4">請先添加病人才能開始記錄</p>
+                <button onclick="openPatientModal()" class="text-medical-600 font-medium">立即添加</button>
+            </div>
+        `;
+    } else {
+        html += `<div class="space-y-3">`;
+        patients.forEach(p => {
+            const isSelected = p.id === appData.currentPatientId;
+            html += `
+                <div onclick="selectPatient('${p.id}')" class="clinical-card bg-white rounded-xl p-4 cursor-pointer ${isSelected ? 'border-medical-500 ring-1 ring-medical-500' : ''}">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 rounded-full ${isSelected ? 'bg-medical-100 text-medical-700' : 'bg-clinical-100 text-clinical-600'} flex items-center justify-center text-lg font-bold">
+                                ${p.name.charAt(0)}
+                            </div>
+                            <div>
+                                <div class="flex items-center space-x-2">
+                                    <h3 class="font-bold text-clinical-900 text-lg">${p.name}</h3>
+                                    ${isSelected ? '<span class="px-2 py-0.5 bg-medical-100 text-medical-700 text-[10px] rounded-full">當前</span>' : ''}
+                                </div>
+                                <div class="text-xs text-clinical-500 mt-0.5">${p.age || '--'}歲 · ${p.gender || '--'} ${p.diagnosisYear ? '· 確診' + (new Date().getFullYear() - p.diagnosisYear) + '年' : ''}</div>
+                            </div>
+                        </div>
+                        <div class="flex space-x-1">
+                            <button onclick="event.stopPropagation(); editPatient('${p.id}')" class="w-8 h-8 rounded-lg hover:bg-clinical-100 flex items-center justify-center text-clinical-400 hover:text-medical-600">
+                                <i class="fas fa-pen text-xs"></i>
+                            </button>
+                            <button onclick="event.stopPropagation(); deletePatient('${p.id}')" class="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-clinical-400 hover:text-red-600">
+                                <i class="fas fa-trash text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        html += `</div>`;
+    }
+    container.innerHTML = html;
+}
+
+function renderRecordPage(container) {
+    if (!appData.currentPatientId) {
+        renderPatientSelector(container);
+        return;
+    }
+
+    const patient = appData.patients.find(p => p.id === appData.currentPatientId);
+    const today = new Date().toISOString().split('T')[0];
+    
+    let html = `
+        <div class="mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-clinical-900">記錄數據</h2>
+                    <p class="text-sm text-clinical-500">${patient.name}</p>
+                </div>
+                <button onclick="renderPatientSelector(document.getElementById('mainContent'))" class="text-xs bg-clinical-100 hover:bg-clinical-200 text-clinical-600 px-3 py-1.5 rounded-lg">
+                    <i class="fas fa-exchange-alt mr-1"></i>切換病人
+                </button>
+            </div>
+            
+            <!-- Date Picker -->
+            <div class="bg-white rounded-xl border border-clinical-200 p-4 mb-4 shadow-sm">
+                <label class="block text-xs font-semibold text-clinical-600 uppercase mb-2">選擇日期</label>
+                <input type="date" 
+                       id="recordDate" 
+                       value="${today}" 
+                       max="${today}"
+                       class="w-full px-4 py-3 bg-clinical-50 border border-clinical-200 rounded-lg text-clinical-900 font-medium input-clinical"
+                       onchange="loadRecordForDate(this.value)">
+                <p class="text-xs text-clinical-400 mt-2">提示：可選擇今天或之前的日期補錄數據</p>
+            </div>
+
+            <div id="recordForm" class="space-y-3"></div>
+            
+            <div class="mt-6 bg-medical-50 border border-medical-100 rounded-xl p-4">
+                <div class="flex items-start space-x-3">
+                    <i class="fas fa-info-circle text-medical-600 mt-0.5"></i>
+                    <div class="text-xs text-medical-800 space-y-1">
+                        <p class="font-semibold">參考指標</p>
+                        <p>• 低血糖：< 3.9 mmol/L (藍色警示)</p>
+                        <p>• 正常範圍：3.9 - 6.1 mmol/L (綠色)</p>
+                        <p>• 高血糖：> 6.1 mmol/L (紅色警示)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    container.innerHTML = html;
+    loadRecordForDate(today);
+}
+
+function loadRecordForDate(date) {
+    const patient = appData.patients.find(p => p.id === appData.currentPatientId);
+    const record = patient.records.find(r => r.date === date) || {};
+    const formContainer = document.getElementById('recordForm');
+    
+    let formHtml = '';
+    
+    healthItems.forEach((item) => {
+        const value = record[item.id] || '';
+        let statusColor = 'border-clinical-200';
+        let valueColor = 'text-clinical-900';
+        
+        if (value !== undefined && value !== null && value !== '') {
+            const numVal = parseFloat(value);
+            if (item.refMin !== null && item.refMax !== null) {
+                if (numVal < item.refMin) { statusColor = 'border-blue-500'; valueColor = 'text-blue-600'; }
+                else if (numVal > item.refMax) { statusColor = 'border-red-500'; valueColor = 'text-red-600'; }
+                else { statusColor = 'border-emerald-500'; valueColor = 'text-emerald-600'; }
+            }
+        }
+
+        formHtml += `
+            <div class="clinical-card bg-white rounded-xl p-4 border-l-4 ${statusColor}" onclick="document.getElementById('input_${item.id}').focus()">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-lg bg-clinical-50 text-clinical-600 flex items-center justify-center">
+                            <i class="fas ${item.icon}"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-clinical-900 text-sm">${item.name}</h3>
+                            <p class="text-xs text-clinical-400">${item.unit}</p>
+                        </div>
+                    </div>
+                    ${value ? `<div class="text-2xl font-bold ${valueColor} font-mono">${value}</div>` : ''}
+                </div>
+                
+                <div class="relative">
+                    <input type="number" 
+                           id="input_${item.id}" 
+                           step="${item.step || 1}" 
+                           value="${value}"
+                           class="w-full px-4 py-3 bg-clinical-50 border border-clinical-200 rounded-lg text-lg font-mono font-semibold text-clinical-900 input-clinical placeholder-clinical-300"
+                           placeholder="${item.placeholder}"
+                           onchange="saveRecordWithDate('${item.id}', this.value)">
+                    ${item.refMin !== null ? `<div class="mt-2 flex justify-between text-[10px] text-clinical-400"><span>正常範圍：${item.refMin}-${item.refMax}</span></div>` : ''}
+                </div>
+            </div>
+        `;
+    });
+    
+    formContainer.innerHTML = formHtml;
+}
+
+function saveRecordWithDate(field, value) {
+    const date = document.getElementById('recordDate').value;
+    if (!date) {
+        showToast('請先選擇日期', 'error');
+        return;
+    }
+    
+    const patient = appData.patients.find(p => p.id === appData.currentPatientId);
+    let record = patient.records.find(r => r.date === date);
+    
+    if (!record) {
+        record = { date: date };
+        patient.records.push(record);
+    }
+    
+    record[field] = value === '' ? null : parseFloat(value);
+    saveData();
+    
+    const input = document.getElementById(`input_${field}`);
+    const card = input.closest('.clinical-card');
+    const item = healthItems.find(i => i.id === field);
+    
+    if (value !== '' && item.refMin !== null) {
+        const numVal = parseFloat(value);
+        card.classList.remove('border-clinical-200', 'border-blue-500', 'border-emerald-500', 'border-red-500');
+        
+        if (numVal < item.refMin) {
+            card.classList.add('border-blue-500');
+            input.classList.add('text-blue-600');
+        } else if (numVal > item.refMax) {
+            card.classList.add('border-red-500');
+            input.classList.add('text-red-600');
+        } else {
+            card.classList.add('border-emerald-500');
+            input.classList.add('text-emerald-600');
+        }
+    }
+    
+    showToast(`${item.name} 已儲存 (${date})`);
+}
+
+function renderPatientSelector(container) {
+    const patients = appData.patients;
+    
+    if (patients.length === 0) {
+        container.innerHTML = `
+            <div class="flex flex-col items-center justify-center h-[60vh] text-clinical-400 animate-slide-up">
+                <div class="w-20 h-20 bg-clinical-100 rounded-full flex items-center justify-center mb-4">
+                    <i class="fas fa-user-plus text-3xl"></i>
+                </div>
+                <h3 class="text-clinical-900 font-bold text-lg mb-2">尚未添加病人</h3>
+                <p class="text-sm text-clinical-500 mb-6 text-center">請先添加第一位病人</p>
+                <button onclick="openPatientModal()" class="bg-medical-600 text-white px-6 py-3 rounded-lg font-semibold shadow-lg">
+                    <i class="fas fa-plus mr-2"></i>添加新病人
+                </button>
+            </div>
+        `;
+        return;
+    }
+
+    let html = `
+        <div class="animate-slide-up">
+            <div class="mb-6 text-center">
+                <h2 class="text-2xl font-bold text-clinical-900 mb-2">選擇病人</h2>
+                <p class="text-sm text-clinical-500">請選擇要記錄數據的病人</p>
+            </div>
+            <div class="space-y-3 mb-6">
+    `;
+
+    patients.forEach(p => {
+        html += `
+            <div onclick="selectPatient('${p.id}')" class="patient-select-card bg-white rounded-xl p-4 cursor-pointer shadow-sm flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="w-12 h-12 rounded-full bg-clinical-100 text-clinical-600 flex items-center justify-center text-lg font-bold">
+                        ${p.name.charAt(0)}
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-clinical-900 text-lg">${p.name}</h3>
+                        <p class="text-xs text-clinical-500">${p.age || '--'}歲 · ${p.gender || '--'} · ${p.records?.length || 0} 次記錄</p>
+                    </div>
+                </div>
+                <i class="fas fa-chevron-right text-clinical-300"></i>
+            </div>
+        `;
+    });
+
+    html += `
+            </div>
+            <div class="border-t border-clinical-200 pt-6">
+                <button onclick="openPatientModal()" class="w-full py-3 border-2 border-dashed border-clinical-300 rounded-xl text-clinical-600 font-semibold hover:border-medical-500 hover:text-medical-600">
+                    <i class="fas fa-plus mr-2"></i>添加新病人
+                </button>
+            </div>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+function selectPatient(id) {
+    appData.currentPatientId = id;
+    saveData();
+    updateHeaderPatient();
+    showPage('record');
+    showToast('已選擇病人，開始記錄');
+}
+
+function clearPatientSelection() {
+    if (confirm('確定要切換病人嗎？')) {
+        appData.currentPatientId = null;
+        saveData();
+        updateHeaderPatient();
+        showPage('record');
+    }
+}
+
+function updateHeaderPatient() {
+    const badge = document.getElementById('currentPatientBadge');
+    const name = document.getElementById('headerPatientName');
+    if (appData.currentPatientId) {
+        const p = appData.patients.find(x => x.id === appData.currentPatientId);
+        if (p) {
+            badge.classList.remove('hidden');
+            name.textContent = p.name;
+            return;
+        }
+    }
+    badge.classList.add('hidden');
+}
+
+function renderReportPage(container) {
+    if (!appData.currentPatientId) {
+        container.innerHTML = `
+            <div class="flex flex-col items-center justify-center h-[60vh] text-clinical-400">
+                <i class="fas fa-chart-line text-4xl mb-3 opacity-30"></i>
+                <p class="text-sm">請先選擇病人</p>
+                <button onclick="showPage('record')" class="mt-4 text-medical-600 font-medium">前往選擇</button>
+            </div>
+        `;
+        return;
+    }
+
+    const patient = appData.patients.find(p => p.id === appData.currentPatientId);
+    const sortedRecords = [...patient.records].sort((a, b) => new Date(a.date) - new Date(b.date)).slice(-7);
+
+    if (sortedRecords.length === 0) {
+        container.innerHTML = `
+            <div class="mb-6"><h2 class="text-2xl font-bold text-clinical-900">趨勢報表</h2><p class="text-sm text-clinical-500">${patient.name}</p></div>
+            <div class="bg-white rounded-xl border border-clinical-200 p-12 text-center text-clinical-400">
+                <i class="fas fa-clipboard-medical text-4xl mb-3 opacity-30"></i>
+                <p class="text-sm">暫無記錄數據</p>
+            </div>
+        `;
+        return;
+    }
+
+    let html = `
+        <div class="mb-6">
+            <h2 class="text-2xl font-bold text-clinical-900">趨勢分析</h2>
+            <p class="text-sm text-clinical-500">${patient.name} · 最近7天</p>
+        </div>
+
+        <div class="bg-white rounded-xl border border-clinical-200 p-4 mb-6 shadow-sm">
+            <h3 class="text-sm font-bold text-clinical-800 mb-4">血糖趨勢</h3>
+            <div class="chart-container">
+                <canvas id="glucoseChart"></canvas>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl border border-clinical-200 overflow-hidden shadow-sm">
+            <div class="px-4 py-3 border-b border-clinical-100 bg-clinical-50">
+                <h3 class="text-sm font-bold text-clinical-800">詳細記錄</h3>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs">
+                    <thead>
+                        <tr class="bg-clinical-50 text-clinical-600 border-b border-clinical-200">
+                            <th class="px-3 py-2 text-left">日期</th>
+                            <th class="px-2 py-2 text-center">空腹</th>
+                            <th class="px-2 py-2 text-center">早後</th>
+                            <th class="px-2 py-2 text-center">午後</th>
+                            <th class="px-2 py-2 text-center">晚後</th>
+                            <th class="px-2 py-2 text-center">血壓</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-clinical-100">
+    `;
+
+    sortedRecords.slice().reverse().forEach(record => {
+        const dateStr = record.date.slice(5);
+        const getColor = (val, min, max) => {
+            if (!val) return 'text-clinical-300';
+            if (val < min) return 'text-blue-600 font-bold';
+            if (val > max) return 'text-red-600 font-bold';
+            return 'text-emerald-600';
+        };
+        
+        html += `
+            <tr class="hover:bg-clinical-50">
+                <td class="px-3 py-2 text-clinical-900 font-medium">${dateStr}</td>
+                <td class="px-2 py-2 text-center ${getColor(record.fastingGlucose, 3.9, 6.1)}">${record.fastingGlucose || '-'}</td>
+                <td class="px-2 py-2 text-center ${getColor(record.breakfast2h, 3.9, 7.8)}">${record.breakfast2h || '-'}</td>
+                <td class="px-2 py-2 text-center ${getColor(record.lunch2h, 3.9, 7.8)}">${record.lunch2h || '-'}</td>
+                <td class="px-2 py-2 text-center ${getColor(record.dinner2h, 3.9, 7.8)}">${record.dinner2h || '-'}</td>
+                <td class="px-2 py-2 text-center text-clinical-700 font-mono">${record.systolicBP || '-'}/${record.diastolicBP || '-'}</td>
+            </tr>
+        `;
+    });
+
+    html += `</tbody></table></div></div>`;
+    container.innerHTML = html;
+
+    setTimeout(() => {
+        const ctx = document.getElementById('glucoseChart');
+        if (!ctx) return;
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: sortedRecords.map(r => r.date.slice(5)),
+                datasets: [
+                    { label: '空腹', data: sortedRecords.map(r => r.fastingGlucose), borderColor: '#3B82F6', tension: 0.4, pointRadius: 3 },
+                    { label: '早餐後', data: sortedRecords.map(r => r.breakfast2h), borderColor: '#EAB308', tension: 0.4, pointRadius: 3 },
+                    { label: '午餐後', data: sortedRecords.map(r => r.lunch2h), borderColor: '#10B981', tension: 0.4, pointRadius: 3 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+                scales: {
+                    y: { beginAtZero: false, min: 2, max: 15, grid: { color: '#F1F5F9' } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }, 100);
+}
+
+function openPatientModal(patientId = null) {
+    const modal = document.getElementById('patientModal');
+    const form = document.getElementById('patientForm');
+    const title = document.getElementById('modalTitle');
+    
+    if (patientId) {
+        const p = appData.patients.find(x => x.id === patientId);
+        title.textContent = '編輯病人資料';
+        document.getElementById('patientId').value = p.id;
+        document.getElementById('pName').value = p.name;
+        document.getElementById('pAge').value = p.age;
+        document.getElementById('pGender').value = p.gender;
+        document.getElementById('pHeight').value = p.height;
+        document.getElementById('pDiagnosisYear').value = p.diagnosisYear;
+    } else {
+        title.textContent = '新增病人';
+        form.reset();
+        document.getElementById('patientId').value = '';
+    }
+    
+    modal.classList.remove('hidden');
+}
+
+function closePatientModal() {
+    document.getElementById('patientModal').classList.add('hidden');
+}
+
+function savePatient(e) {
+    e.preventDefault();
+    const id = document.getElementById('patientId').value;
+    const patientData = {
+        id: id || generateId(),
+        name: document.getElementById('pName').value,
+        age: document.getElementById('pAge').value,
+        gender: document.getElementById('pGender').value,
+        height: document.getElementById('pHeight').value,
+        diagnosisYear: document.getElementById('pDiagnosisYear').value,
+        records: id ? appData.patients.find(p => p.id === id).records : []
+    };
+
+    if (id) {
+        const idx = appData.patients.findIndex(p => p.id === id);
+        appData.patients[idx] = patientData;
+        showToast('資料已更新');
+    } else {
+        appData.patients.push(patientData);
+        appData.currentPatientId = patientData.id;
+        showToast('新病人已添加');
+    }
+
+    saveData();
+    closePatientModal();
+    updateHeaderPatient();
+    showPage('record');
+}
+
+function editPatient(id) {
+    openPatientModal(id);
+}
+
+function deletePatient(id) {
+    if (confirm('確定要刪除這位病人及其所有記錄嗎？')) {
+        appData.patients = appData.patients.filter(p => p.id !== id);
+        if (appData.currentPatientId === id) appData.currentPatientId = null;
+        saveData();
+        showPage('patients');
+        updateHeaderPatient();
+        showToast('病人已刪除');
+    }
+}
+</script>
+
+</body>
+</html>
