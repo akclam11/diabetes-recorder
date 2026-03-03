@@ -1,0 +1,20 @@
+{
+  "name": "糖友指數記錄儀 - Salus Healthcare",
+  "short_name": "糖友記錄",
+  "description": "Salus Healthcare 糖尿病管理系統",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#F8FAFC",
+  "theme_color": "#0F172A",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "logo.png",
+      "sizes": "72x72 96x96 128x128 144x144 152x152 192x192 384x384 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["health", "medical"],
+  "lang": "zh-HK"
+}
